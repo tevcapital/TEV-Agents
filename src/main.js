@@ -14,17 +14,21 @@ const store = new Store({
       mode: 'openllms',
       groqApiKey: '',
       groqModel: 'llama-3.3-70b-versatile',
+      groqCustomModel: '',
       geminiApiKey: '',
       geminiModel: 'gemini-2.0-flash',
       openrouterApiKey: '',
       openrouterModel: 'qwen/qwen3-4b:free',
+      openrouterCustomModel: '',
       activeOpenLLMProvider: 'groq',
       ollamaModel: 'qwen3.5:4b',
       ollamaUrl: 'http://localhost:11434',
       anthropicApiKey: '',
       anthropicModel: 'claude-opus-4-7',
+      anthropicCustomModel: '',
       openaiApiKey: '',
       openaiModel: 'gpt-5.4',
+      openaiCustomModel: '',
       activeFrontierProvider: 'anthropic',
       tavilyApiKey: ''
     },
@@ -591,19 +595,49 @@ function getProviderConfig(settings) {
     const activeProvider = settings.activeFrontierProvider === 'openai' ? 'openai' : 'anthropic';
     return getProviderConfig({ ...settings, mode: activeProvider });
   }
-  if (mode === 'groq') return { mode, endpoint: GROQ_URL, apiKey: settings.groqApiKey, model: settings.groqModel, extraHeaders: {} };
+  const resolveConfiguredModel = (primaryKey, customKey, fallback) => {
+    const rawModel = String(settings?.[primaryKey] || '').trim();
+    if (rawModel !== 'custom') return rawModel || fallback;
+    const customModel = String(settings?.[customKey] || '').trim();
+    return customModel || fallback;
+  };
+  if (mode === 'groq') {
+    return {
+      mode,
+      endpoint: GROQ_URL,
+      apiKey: settings.groqApiKey,
+      model: resolveConfiguredModel('groqModel', 'groqCustomModel', 'llama-3.3-70b-versatile'),
+      extraHeaders: {}
+    };
+  }
   if (mode === 'gemini') return { mode, endpoint: GEMINI_URL, apiKey: settings.geminiApiKey, model: settings.geminiModel, extraHeaders: {} };
   if (mode === 'openrouter') {
     return {
       mode,
       endpoint: OPENROUTER_URL,
       apiKey: settings.openrouterApiKey,
-      model: settings.openrouterModel,
+      model: resolveConfiguredModel('openrouterModel', 'openrouterCustomModel', 'qwen/qwen3-4b:free'),
       extraHeaders: { 'HTTP-Referer': 'https://tevagents.local', 'X-Title': 'TEV Agents' }
     };
   }
-  if (mode === 'anthropic') return { mode, endpoint: ANTHROPIC_URL, apiKey: settings.anthropicApiKey, model: settings.anthropicModel, extraHeaders: {} };
-  if (mode === 'openai') return { mode, endpoint: OPENAI_URL, apiKey: settings.openaiApiKey, model: settings.openaiModel, extraHeaders: {} };
+  if (mode === 'anthropic') {
+    return {
+      mode,
+      endpoint: ANTHROPIC_URL,
+      apiKey: settings.anthropicApiKey,
+      model: resolveConfiguredModel('anthropicModel', 'anthropicCustomModel', 'claude-opus-4-7'),
+      extraHeaders: {}
+    };
+  }
+  if (mode === 'openai') {
+    return {
+      mode,
+      endpoint: OPENAI_URL,
+      apiKey: settings.openaiApiKey,
+      model: resolveConfiguredModel('openaiModel', 'openaiCustomModel', 'gpt-5.4'),
+      extraHeaders: {}
+    };
+  }
   return { mode: 'ollama', endpoint: settings.ollamaUrl || 'http://localhost:11434', model: settings.ollamaModel };
 }
 

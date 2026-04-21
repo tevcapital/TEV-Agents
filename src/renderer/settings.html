@@ -155,6 +155,7 @@
           <div class="row">
             <label for="groqModel">Groq Model</label>
             <select id="groqModel"></select>
+            <input id="groqCustomModelInput" type="text" placeholder="Enter custom Groq model ID" style="display: none; margin-top: 8px;" />
           </div>
         </div>
 
@@ -184,7 +185,9 @@
                 <option value="nvidia/nemotron-nano-12b-v2:free">nemotron-12b</option>
                 <option value="nvidia/nemotron-3-nano-30b-a3b:free">nemotron-30b</option>
               </optgroup>
+              <option value="custom">Custom...</option>
             </select>
+            <input id="openrouterCustomModelInput" type="text" placeholder="Enter custom OpenRouter model ID" style="display: none; margin-top: 8px;" />
           </div>
         </div>
       </div>
@@ -225,7 +228,9 @@
               <option value="claude-opus-4-7">claude-opus-4-7</option>
               <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
               <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+              <option value="custom">Custom...</option>
             </select>
+            <input id="anthropicCustomModelInput" type="text" placeholder="Enter custom Anthropic model ID (e.g. claude-opus-5)" style="display: none; margin-top: 8px;" />
           </div>
         </div>
 
@@ -241,7 +246,9 @@
               <option value="gpt-5.4">gpt-5.4</option>
               <option value="gpt-5.4-mini">gpt-5.4-mini</option>
               <option value="gpt-4o">gpt-4o</option>
+              <option value="custom">Custom...</option>
             </select>
+            <input id="openaiCustomModelInput" type="text" placeholder="Enter custom OpenAI model ID (e.g. gpt-6)" style="display: none; margin-top: 8px;" />
           </div>
         </div>
       </div>
@@ -260,9 +267,18 @@
       const modeIds = { openllms: 'OpenLLMs', ollama: 'Ollama', frontier: 'Frontier' };
       const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
       const DEFAULT_OLLAMA_MODEL = 'qwen3.5:4b';
+      const DEFAULT_OPENROUTER_MODEL = 'qwen/qwen3-4b:free';
+      const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-4-7';
+      const DEFAULT_OPENAI_MODEL = 'gpt-5.4';
       const groqModelSelect = document.getElementById('groqModel');
       const groqApiKeyInput = document.getElementById('groqApiKey');
       let latestSettings = null;
+      const modelFieldConfigs = [
+        { selectId: 'groqModel', inputId: 'groqCustomModelInput', defaultValue: DEFAULT_GROQ_MODEL, customKey: 'groqCustomModel' },
+        { selectId: 'openrouterModel', inputId: 'openrouterCustomModelInput', defaultValue: DEFAULT_OPENROUTER_MODEL, customKey: 'openrouterCustomModel' },
+        { selectId: 'anthropicModel', inputId: 'anthropicCustomModelInput', defaultValue: DEFAULT_ANTHROPIC_MODEL, customKey: 'anthropicCustomModel' },
+        { selectId: 'openaiModel', inputId: 'openaiCustomModelInput', defaultValue: DEFAULT_OPENAI_MODEL, customKey: 'openaiCustomModel' }
+      ];
 
       function setMode(mode) {
         currentMode = mode;
@@ -313,6 +329,14 @@
         });
       }
 
+      function appendCustomOption(selectEl) {
+        if ([...selectEl.options].some((opt) => opt.value === 'custom')) return;
+        const opt = document.createElement('option');
+        opt.value = 'custom';
+        opt.textContent = 'Custom...';
+        selectEl.appendChild(opt);
+      }
+
       function ensureSelectValue(id, value) {
         const el = document.getElementById(id);
         let found = false;
@@ -332,6 +356,14 @@
         }
       }
 
+      function syncCustomModelVisibility(selectEl, customInputEl) {
+        customInputEl.style.display = selectEl.value === 'custom' ? 'block' : 'none';
+      }
+
+      function wireCustomModelToggle(selectEl, customInputEl) {
+        selectEl.addEventListener('change', () => syncCustomModelVisibility(selectEl, customInputEl));
+      }
+
       async function refreshGroqModels(selectedValue = '') {
         const models = await window.desk.getGroqModels();
         const nextValue = selectedValue || groqModelSelect.value || DEFAULT_GROQ_MODEL;
@@ -341,6 +373,9 @@
           nextValue,
           (value) => value === DEFAULT_GROQ_MODEL ? `${value} (default)` : value
         );
+        appendCustomOption(groqModelSelect);
+        if (nextValue === 'custom') groqModelSelect.value = 'custom';
+        syncCustomModelVisibility(groqModelSelect, document.getElementById('groqCustomModelInput'));
       }
 
       function collectDraftSettings() {
@@ -348,15 +383,19 @@
           mode: currentMode,
           groqApiKey: groqApiKeyInput.value.trim(),
           groqModel: groqModelSelect.value || DEFAULT_GROQ_MODEL,
+          groqCustomModel: document.getElementById('groqCustomModelInput').value.trim(),
           openrouterApiKey: document.getElementById('openrouterApiKey').value.trim(),
-          openrouterModel: document.getElementById('openrouterModel').value || 'qwen/qwen3-4b:free',
+          openrouterModel: document.getElementById('openrouterModel').value || DEFAULT_OPENROUTER_MODEL,
+          openrouterCustomModel: document.getElementById('openrouterCustomModelInput').value.trim(),
           activeOpenLLMProvider: getCheckedValue('activeOpenLLMProvider', 'groq'),
           ollamaUrl: document.getElementById('ollamaUrl').value.trim() || 'http://localhost:11434',
           ollamaModel: document.getElementById('ollamaModel').value || DEFAULT_OLLAMA_MODEL,
           anthropicApiKey: document.getElementById('anthropicApiKey').value.trim(),
-          anthropicModel: document.getElementById('anthropicModel').value || 'claude-opus-4-7',
+          anthropicModel: document.getElementById('anthropicModel').value || DEFAULT_ANTHROPIC_MODEL,
+          anthropicCustomModel: document.getElementById('anthropicCustomModelInput').value.trim(),
           openaiApiKey: document.getElementById('openaiApiKey').value.trim(),
-          openaiModel: document.getElementById('openaiModel').value || 'gpt-5.4',
+          openaiModel: document.getElementById('openaiModel').value || DEFAULT_OPENAI_MODEL,
+          openaiCustomModel: document.getElementById('openaiCustomModelInput').value.trim(),
           activeFrontierProvider: getCheckedValue('activeFrontierProvider', 'anthropic'),
           tavilyApiKey: document.getElementById('tavilyApiKey').value.trim()
         };
@@ -383,12 +422,23 @@
         document.getElementById('anthropicApiKey').value = settings.anthropicApiKey || '';
         document.getElementById('openaiApiKey').value = settings.openaiApiKey || '';
         document.getElementById('tavilyApiKey').value = settings.tavilyApiKey || '';
+        document.getElementById('groqCustomModelInput').value = settings.groqCustomModel || '';
+        document.getElementById('openrouterCustomModelInput').value = settings.openrouterCustomModel || '';
+        document.getElementById('anthropicCustomModelInput').value = settings.anthropicCustomModel || '';
+        document.getElementById('openaiCustomModelInput').value = settings.openaiCustomModel || '';
 
-        ensureSelectValue('openrouterModel', settings.openrouterModel || 'qwen/qwen3-4b:free');
-        ensureSelectValue('anthropicModel', settings.anthropicModel || 'claude-opus-4-7');
-        ensureSelectValue('openaiModel', settings.openaiModel || 'gpt-5.4');
+        appendCustomOption(document.getElementById('openrouterModel'));
+        appendCustomOption(document.getElementById('anthropicModel'));
+        appendCustomOption(document.getElementById('openaiModel'));
+        ensureSelectValue('openrouterModel', settings.openrouterModel || DEFAULT_OPENROUTER_MODEL);
+        ensureSelectValue('anthropicModel', settings.anthropicModel || DEFAULT_ANTHROPIC_MODEL);
+        ensureSelectValue('openaiModel', settings.openaiModel || DEFAULT_OPENAI_MODEL);
 
         await refreshGroqModels(settings.groqModel || DEFAULT_GROQ_MODEL);
+
+        modelFieldConfigs.forEach(({ selectId, inputId }) => {
+          syncCustomModelVisibility(document.getElementById(selectId), document.getElementById(inputId));
+        });
 
         const ollamaSelect = document.getElementById('ollamaModel');
         ollamaSelect.innerHTML = '';
@@ -419,6 +469,10 @@
         const status = document.getElementById('status');
         status.textContent = 'Saved';
         setTimeout(() => { status.textContent = ''; }, 1800);
+      });
+
+      modelFieldConfigs.forEach(({ selectId, inputId }) => {
+        wireCustomModelToggle(document.getElementById(selectId), document.getElementById(inputId));
       });
 
       init();
